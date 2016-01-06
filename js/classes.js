@@ -54,24 +54,17 @@ function Body(radius, mass, rigid) {
 		};
 	}
 
-	this.update = function(dt) {
-		if (!_.rigid) {
-			var halfstep = dt/2;
-
-			_.position.x += (_.velocity.x * dt) + acceleration.x * dt * halfstep;
-			_.position.y += (_.velocity.y * dt) + acceleration.y * dt * halfstep;
-		}
+	this.accelerate = function(_acceleration) {
+		acceleration.set(_acceleration.x, _acceleration.y);
 	}
 
-	this.verlet = function(_acceleration, dt) {
-		var halfstep = dt/2;
+	this.update = function(dt) {
+		if (!_.rigid) {
+			_.velocity.x += acceleration.x * dt;
+			_.velocity.y += acceleration.y * dt;
 
-		_.velocity.x += (acceleration.x + _acceleration.x) * 0.5 * halfstep;
-		_.velocity.y += (acceleration.y + _acceleration.y) * 0.5 * halfstep;
-
-		acceleration.set(_acceleration.x, _acceleration.y);
-
-		//_.velocity.x += acceleration.x * 0.5 * halfstep;
-		//_.velocity.y += acceleration.y * 0.5 * halfstep;
+			_.position.x += _.velocity.x * dt;
+			_.position.y += _.velocity.y * dt;
+		}
 	}
 }

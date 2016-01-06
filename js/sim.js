@@ -1,5 +1,8 @@
 (function(global){
-	var simulation, screen, running = false;
+	var simulation;
+	var screen;
+	var time = Date.now();
+	var running = false;
 
 	var delay = 1000 / 60;
 	var width = 1000;
@@ -24,45 +27,52 @@
 		// Private:
 		var _ = this;
 		var G = 66.7;
-		var time = Date.now();
 		var maxForce = 500;
 		var distanceThreshold = 10;
 
 		var bodies = [];
 
 		// Public:
-		this.tick = function(steps) {
-			var dt = ((Date.now() - time) / 1000) * (steps || 1);
-
+		this.tick = function(dt, steps) {
 			// Clear screen
-			//screen.fill(Color.BLACK);
+			screen.fill(Color.BLACK);
 
-			// Run updates on celestial bodies
-			for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
-				var body = bodies[b];
+			steps = steps || 1;
 
-				var acceleration = new Vec2(0, 0);
-
-				body.update(dt);
-
-				for (var c = 0 ; c < bodyCount ; c++) {
-					if (c === b) {
-						continue;
-					}
+			// For however many steps specified...
+			for (var s = 0 ; s < steps ; s++) {
+				// ...run updates on celestial bodies
+				for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
+					var body = bodies[b];
+					var acceleration = new Vec2(0, 0);
 
 					// Calculate force of gravity from each neighboring body
-					var force = bodies[c].calculateForceAt(body.position);
+					for (var c = 0 ; c < bodyCount ; c++) {
+						if (c === b) {
+							// Ignore self
+							continue;
+						}
 
-					acceleration.x -= G*force.x;
-					acceleration.y -= G*force.y;
+						var force = bodies[c].calculateForceAt(body.position);
+
+						acceleration.x -= G*force.x;
+						acceleration.y -= G*force.y;
+					}
+
+					if (acceleration.magnitude() > maxForce) {
+						// Normalize excessively high acceleration values
+						acceleration.normalize(maxForce);
+					} 
+
+					body.accelerate(acceleration);
+					body.update(dt);
 				}
+			}
+		}
 
-				if (acceleration.magnitude() > maxForce) {
-					// Normalize excessively high acceleration values
-					acceleration.normalize(maxForce);
-				} 
-
-				body.verlet(acceleration, dt);
+		this.render = function() {
+			for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
+				var body = bodies[b];
 
 				// Only redraw if body is within screen space
 				if (body.position.x + body.radius > 0 && body.position.x - body.radius < width) {
@@ -71,9 +81,6 @@
 					}
 				}
 			}
-
-			// Update latest frame time
-			time = Date.now();
 		}
 
 		this.addBody = function(radius, mass, position, velocity, rigid) {
@@ -90,7 +97,15 @@
 	 */
 	function main() {
 		if (running) {
-			simulation.tick();
+			var dt = ((Date.now() - time) / 1000);
+
+			simulation.tick(dt);
+			simulation.render();
+
+			// Update latest frame time
+			time = Date.now();
+
+			//requestAnimationFrame(main)
 			setTimeout(main, delay);
 		}
 	}
@@ -112,8 +127,8 @@
 		resetSimulation();
 		resetScreen();
 
-		simulation.addBody(1, 15, new Vec2(250, 250), new Vec2(2, 25));
-		//simulation.addBody(1, 115, new Vec2(420, 200), new Vec2(-2, 15));
+		simulation.addBody(1, 100, new Vec2(250, 250), new Vec2(2, 30));
+		simulation.addBody(1, 115, new Vec2(420, 200), new Vec2(-2, 15));
 		simulation.addBody(2, 2005, new Vec2(350, 300), null, true);
 
 		main();
