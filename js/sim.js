@@ -1,6 +1,7 @@
 (function(global){
 	var simulation, screen, running = false;
 
+	var delay = 1000 / 60;
 	var width = 1000;
 	var height = 600;
 
@@ -21,24 +22,20 @@
 	 */
 	function Simulation() {
 		// Private:
-		var G = 0;
-		var bodies = [];
+		var _ = this;
+		var G = 66.7;
 		var time = Date.now();
+		var maxForce = 500;
+		var distanceThreshold = 10;
 
-		function spawn(radius, mass, position, velocity) {
-			position = position || new Vec2(0, 0);
-			velocity = velocity || new Vec2(0, 0);
-
-			bodies.push(new Body(radius, mass).setPosition(position).setVelocity(velocity));
-		}
+		var bodies = [];
 
 		// Public:
 		this.tick = function(steps) {
-			var dt = Date.now() - time;
-			steps = steps || 1;
+			var dt = ((Date.now() - time) / 1000) * (steps || 1);
 
 			// Clear screen
-			screen.fill(Color.BLACK);
+			//screen.fill(Color.BLACK);
 
 			// Run updates on celestial bodies
 			for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
@@ -46,19 +43,26 @@
 
 				var acceleration = new Vec2(0, 0);
 
+				body.update(dt);
+
 				for (var c = 0 ; c < bodyCount ; c++) {
 					if (c === b) {
 						continue;
 					}
 
-					var force = bodies[c].calculateForceAt(new Vec2(body.x, body.y));
+					// Calculate force of gravity from each neighboring body
+					var force = bodies[c].calculateForceAt(body.position);
 
-					acceleration.x += G*force.x;
-					acceleration.y += G*force.y;
+					acceleration.x -= G*force.x;
+					acceleration.y -= G*force.y;
 				}
 
-				body.accelerate(acceleration);
-				body.update(steps, dt);
+				if (acceleration.magnitude() > maxForce) {
+					// Normalize excessively high acceleration values
+					acceleration.normalize(maxForce);
+				} 
+
+				body.verlet(acceleration, dt);
 
 				// Only redraw if body is within screen space
 				if (body.position.x + body.radius > 0 && body.position.x - body.radius < width) {
@@ -68,15 +72,16 @@
 				}
 			}
 
-			if (Math.random() < 0.5) {
-				var rad = 1 + Math.round(Math.random() * 10);
-				var pos = new Vec2(Math.random() * width, Math.random() * height);
-				var vel = new Vec2(Math.random() - 0.5, Math.random() - 0.5);
-				spawn(rad, 1, pos, vel);
-			}
-
 			// Update latest frame time
 			time = Date.now();
+		}
+
+		this.addBody = function(radius, mass, position, velocity, rigid) {
+			position = position || new Vec2(0, 0);
+			velocity = velocity || new Vec2(0, 0);
+			rigid = !!rigid || false;
+
+			bodies.push(new Body(radius, mass, rigid).setPosition(position).setVelocity(velocity));
 		}
 	}
 
@@ -86,7 +91,7 @@
 	function main() {
 		if (running) {
 			simulation.tick();
-			requestAnimationFrame(main);
+			setTimeout(main, delay);
 		}
 	}
 
@@ -106,6 +111,11 @@
 
 		resetSimulation();
 		resetScreen();
+
+		simulation.addBody(1, 15, new Vec2(250, 250), new Vec2(2, 25));
+		//simulation.addBody(1, 115, new Vec2(420, 200), new Vec2(-2, 15));
+		simulation.addBody(2, 2005, new Vec2(350, 300), null, true);
+
 		main();
 	}
 
