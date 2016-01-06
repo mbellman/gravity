@@ -8,11 +8,7 @@
 	var width = 1000;
 	var height = 600;
 
-	var camera = new Vec2(0, 0);
-
-	/**
-	 * Color bank
-	 */
+	// Color bank
 	var Color = {
 		WHITE: '#FFF',
 		BLACK: '#000',
@@ -21,6 +17,49 @@
 		BLUE: '#00F',
 		PURPLE: '#606'
 	};
+
+	// Rendering/simulation parameters
+	var camera = new Vec2(width/2, height/2);
+	var zoom = 1;
+	var speed = 1;
+
+	function setZoom(value) {
+		zoom = value;
+		$('#zoom').text( Math.round(value * 100) / 100 );
+	}
+
+	function setSpeed(value) {
+		speed = value;
+		$('#speed').text( Math.round(value * 100) / 100 );
+	}
+
+	function setCamera(x, y) {
+		camera.set(x, y);
+		$('#coordinates').text(Math.round(x) + ', ' + Math.round(y));
+	}
+
+	function grabCamera(e) {
+		var mouse = {
+			x: e.clientX,
+			y: e.clientY
+		};
+
+		var initial = {
+			x: camera.x,
+			y: camera.y
+		};
+
+		$(document).on('mousemove', function(e2){
+			var newX = initial.x + (mouse.x - e2.clientX) / zoom;
+			var newY = initial.y + (mouse.y - e2.clientY) / zoom;
+
+			setCamera(newX, newY);
+		});
+
+		$(document).on('mouseup', function(){
+			$(document).off('mouseup mousemove');
+		});
+	}
 
 	/**
 	 * Simulation logic
@@ -102,7 +141,7 @@
 					b++;
 				}
 
-				// After gravitational acceleration is calculated for each body, update their positions
+				// After acceleration is calculated for each body, update their positions
 				for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
 					bodies[b].update(dt);
 				}
@@ -114,15 +153,16 @@
 			for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
 				var body = bodies[b];
 
-				var pos = {
-					x: body.position.x - camera.x,
-					y: body.position.y - camera.y
+				var object = {
+					x: width/2 + (body.position.x - camera.x) * zoom,
+					y: height/2 + (body.position.y - camera.y) * zoom,
+					radius: body.radius * zoom
 				};
 
 				// Only draw if body is within screen space
-				if (pos.x + body.radius > 0 && pos.x - body.radius < width) {
-					if (pos.y + body.radius > 0 && pos.y - body.radius < height) {
-						screen.circle(pos.x, pos.y, body.radius, Color.WHITE);
+				if (object.x + object.radius > 0 && object.x - object.radius < width) {
+					if (object.y + object.radius > 0 && object.y - object.radius < height) {
+						screen.circle(object.x, object.y, object.radius, Color.WHITE);
 					}
 				}
 			}
@@ -146,7 +186,7 @@
 			var dt = ((Date.now() - time) / 1000);
 
 			// Update and re-draw simulation
-			simulation.tick(dt);
+			simulation.tick(dt * speed);
 			simulation.render();
 
 			// Update latest frame time
@@ -157,10 +197,6 @@
 		}
 	}
 
-	function resetSimulation() {
-		simulation = new Simulation();
-	}
-
 	function resetScreen() {
 		var canvas = $('#screen')[0];
 
@@ -169,44 +205,55 @@
 	}
 
 	function init() {
+		// Permit main loop
 		running = true;
 
-		resetSimulation();
+		// Restart simulation + refresh screen
+		simulation = new Simulation();
 		resetScreen();
 
-		$('#screen').on('mousedown', grabCamera);
+		setCamera(width/2, height/2);
 
 		for (var i = 0 ; i < 2000 ; i++) {
 			var radius = Math.random() * 5;
 			var mass = Math.random() * 1000;
 			var position = new Vec2(Math.random()*width, Math.random()*height);
-			var velocity = new Vec2(0, 0);
-			simulation.addBody(radius, mass, position, velocity);
+			simulation.addBody(radius, mass, position);
 		}
 
 		main();
 	}
 
-	function grabCamera(e) {
-		var mouse = {
-			x: e.clientX,
-			y: e.clientY
-		};
+	$(window).load(function(){
+		// Camera drag
+		$('#screen').on('mousedown', grabCamera);
 
-		var initial = {
-			x: camera.x,
-			y: camera.y
-		};
+		// Zooming
+		$(document).on('mousewheel', function(e){
+			if (e.deltaY < 0) {
+				// Zoom out
+				setZoom(zoom * Math.pow(0.99, Math.abs(e.deltaY)));
+			}
 
-		$('body').on('mousemove', function(e2){
-			camera.x = initial.x + (mouse.x - e2.clientX);
-			camera.y = initial.y + (mouse.y - e2.clientY);
+			if (e.deltaY > 0) {
+				// Zoom in
+				setZoom(zoom * Math.pow(1.01, Math.abs(e.deltaY)));
+			}
 		});
 
-		$('body').on('mouseup', function(){
-			$('body').off('mouseup mousemove');
-		});
-	}
+		// Adjusting simulation speed
+		$(document).on('keydown', function(e){
+			if (e.keyCode === 37) {
+				// Slow down simulation
+				setSpeed(speed * 0.9);
+			}
 
-	$(window).load(init);
+			if (e.keyCode === 39) {
+				// Speed up simulation
+				setSpeed(speed * 1.1);
+			}
+		});
+
+		init();
+	});
 })(window, jQuery);

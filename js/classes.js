@@ -59,10 +59,10 @@ function Body(radius, mass, rigid) {
 		return Math.sqrt(dx*dx + dy*dy);
 	}
 
-	this.forceAt = function(position) {
+	this.forceAt = function(position, scale) {
 		var dx = position.x - _.position.x;
 		var dy = position.y - _.position.y;
-		var r = Math.sqrt(dx*dx + dy*dy);
+		var r = Math.sqrt(dx*dx + dy*dy) * (scale || 1);
 		var force = _.mass / (r*r);
 
 		return {
