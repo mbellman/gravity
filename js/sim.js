@@ -5,8 +5,12 @@
 	var running = false;
 
 	var delay = 1000 / 60;
+
 	var width = 1000;
 	var height = 600;
+
+	var halfWidth = width/2;
+	var halfHeight = height/2;
 
 	// Color bank
 	var Color = {
@@ -19,9 +23,11 @@
 	};
 
 	// Rendering/simulation parameters
-	var camera = new Vec2(width/2, height/2);
+	var camera = new Vec2(halfWidth, halfHeight);
 	var zoom = 1;
 	var speed = 1;
+	var reverse = false;
+	var distanceScalar = 5;
 
 	function setZoom(value) {
 		zoom = value;
@@ -118,7 +124,7 @@
 						}
 
 						// Determine gravitational force of secondary body on primary body
-						var force = body2.forceAt(body.position);
+						var force = body2.forceAt(body.position, distanceScalar);
 
 						acceleration.x -= G*force.x;
 						acceleration.y -= G*force.y;
@@ -143,7 +149,7 @@
 
 				// After acceleration is calculated for each body, update their positions
 				for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
-					bodies[b].update(dt);
+					bodies[b].update(dt, reverse);
 				}
 			}
 		}
@@ -154,8 +160,8 @@
 				var body = bodies[b];
 
 				var object = {
-					x: width/2 + (body.position.x - camera.x) * zoom,
-					y: height/2 + (body.position.y - camera.y) * zoom,
+					x: halfWidth + (body.position.x - camera.x) * zoom,
+					y: halfHeight + (body.position.y - camera.y) * zoom,
 					radius: body.radius * zoom
 				};
 
@@ -175,6 +181,38 @@
 			rigid = !!rigid || false;
 
 			bodies.push(new Body(radius, mass, rigid).setPosition(position).setVelocity(velocity));
+		}
+
+		this.addAccretionDisk = function(options) {
+			$.extend({
+				x: halfWidth,
+				y: halfHeight,
+				radius: 200,
+				bodies: 100,
+				masses: [1, 50]
+			}, options);
+
+			var tau = 2 * Math.PI;
+
+			for (var i = 0 ; i < options.bodies ; i++) {
+				// Distribute positions randomly around a pseudo-origin at [options.x, options.y]
+				var angle = Math.random() * tau;
+				var magnitude = Math.random() * options.radius;
+				var position = new Vec2(options.x + Math.cos(angle) * magnitude, options.y + Math.sin(angle) * magnitude);
+
+				// Set mass/size (heavier bodies nearer to center)
+				var mass = options.masses[0] + options.masses[1] * ((options.radius - magnitude) / options.radius);
+				var radius = 1 + Math.log(Math.max(1, mass)) / 10;
+
+				// Determine a semi-stable disk center orbital velocity vector for this body
+				var velocity = new Vec2(5000*Math.sin(angle) / (magnitude / distanceScalar), -5000*Math.cos(angle) / (magnitude / distanceScalar));
+
+				if (velocity.magnitude() > 10) {
+					velocity.normalize(10);
+				}
+
+				_.addBody(radius, mass, position, velocity);
+			}
 		}
 	}
 
@@ -212,14 +250,17 @@
 		simulation = new Simulation();
 		resetScreen();
 
-		setCamera(width/2, height/2);
+		// Initialize camera at origin
+		setCamera(halfWidth, halfHeight);
 
-		for (var i = 0 ; i < 2000 ; i++) {
-			var radius = Math.random() * 5;
-			var mass = Math.random() * 1000;
-			var position = new Vec2(Math.random()*width, Math.random()*height);
-			simulation.addBody(radius, mass, position);
-		}
+		// Customize initial state
+		simulation.addAccretionDisk({
+			x: 500,
+			y: 300,
+			radius: 300,
+			bodies: 500,
+			masses: [0, 1000]
+		});
 
 		main();
 	}
@@ -241,7 +282,7 @@
 			}
 		});
 
-		// Adjusting simulation speed
+		// Adjusting simulation speed/direction
 		$(document).on('keydown', function(e){
 			if (e.keyCode === 37) {
 				// Slow down simulation
@@ -251,6 +292,11 @@
 			if (e.keyCode === 39) {
 				// Speed up simulation
 				setSpeed(speed * 1.1);
+			}
+
+			if (e.keyCode === 32) {
+				// Time reversal
+				reverse = !reverse;
 			}
 		});
 

@@ -46,7 +46,7 @@ function Body(radius, mass, rigid) {
 		var radius = (_.radius > body.radius ? _.radius : body.radius) * 1.01;
 		var mass = (_.mass + body.mass) * 0.99;
 		var position = new Vec2((_.position.x + body.position.x) / 2, (_.position.y + body.position.y) / 2);
-		var momentum = new Vec2((_.velocity.x + body.velocity.x) / 2, (_.velocity.y + body.velocity.y) / 2);
+		var momentum = new Vec2((_.velocity.x * _.mass + body.velocity.x * body.mass) / 2, (_.velocity.y * _.mass + body.velocity.y * body.mass) / 2);
 		var velocity = new Vec2(momentum.x / mass, momentum.y / mass);
 
 		return new Body(radius, mass).setPosition(position).setVelocity(velocity);
@@ -75,13 +75,15 @@ function Body(radius, mass, rigid) {
 		acceleration.set(_acceleration.x, _acceleration.y);
 	}
 
-	this.update = function(dt) {
+	this.update = function(dt, reverse) {
 		if (!_.rigid) {
-			_.velocity.x += acceleration.x * dt;
-			_.velocity.y += acceleration.y * dt;
+			var direction = (reverse ? -1 : 1);
 
-			_.position.x += _.velocity.x * dt;
-			_.position.y += _.velocity.y * dt;
+			_.velocity.x += acceleration.x * dt * direction;
+			_.velocity.y += acceleration.y * dt * direction;
+
+			_.position.x += _.velocity.x * dt * direction;
+			_.position.y += _.velocity.y * dt * direction;
 		}
 	}
 }
