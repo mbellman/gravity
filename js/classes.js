@@ -1,3 +1,23 @@
+/**
+ * Handy formulas
+ */
+var Calculate = {
+	radius: function(mass) {
+		return 1 + Math.log(Math.max(1, mass)) / 5;
+	},
+	distance: function(vec2a, vec2b) {
+		var dx = vec2a.x - vec2b.x;
+		var dy = vec2a.y - vec2b.y;
+		return Math.sqrt(dx*dx + dy*dy);
+	},
+	orbitalVelocity: function(mass, radius) {
+		return Math.sqrt(mass / radius);
+	}
+};
+
+/**
+ * 2D vector object
+ */
 function Vec2(x, y) {
 	var _ = this;
 	this.x = x;
@@ -6,10 +26,15 @@ function Vec2(x, y) {
 	this.set = function(x, y) {
 		_.x = x;
 		_.y = y;
+
+		return _;
 	}
 
-	this.magnitude = function() {
-		return Math.sqrt(_.x*_.x + _.y*_.y);
+	this.translate = function(x, y) {
+		_.x += x;
+		_.y += y;
+
+		return _;
 	}
 
 	this.normalize = function(maximum) {
@@ -17,9 +42,24 @@ function Vec2(x, y) {
 
 		_.x *= normalizer;
 		_.y *= normalizer;
+
+		return _;
 	}
+
+	this.averageWith = function(vec2) {
+		return new Vec2((_.x + vec2.x) / 2, (_.y + vec2.y) / 2);
+	}
+
+	this.magnitude = function() {
+		return Math.sqrt(_.x*_.x + _.y*_.y);
+	}
+
+	return _;
 }
 
+/**
+ * Celestial body object
+ */
 function Body(radius, mass, rigid) {
 	// Private:
 	var _ = this;
@@ -43,23 +83,34 @@ function Body(radius, mass, rigid) {
 	}
 
 	this.mergeWith = function(body) {
-		var radius = (_.radius > body.radius ? _.radius : body.radius) * 1.01;
-		var mass = (_.mass + body.mass) * 0.99;
-		var position = new Vec2((_.position.x + body.position.x) / 2, (_.position.y + body.position.y) / 2);
-		var momentum = new Vec2((_.velocity.x * _.mass + body.velocity.x * body.mass) / 2, (_.velocity.y * _.mass + body.velocity.y * body.mass) / 2);
-		var velocity = new Vec2(momentum.x / mass, momentum.y / mass);
+		var largerBody = (_.mass > body.mass ? _ : body);
 
-		return new Body(radius, mass).setPosition(position).setVelocity(velocity);
+		var mass = _.mass + body.mass;
+		var radius = Calculate.radius(mass * 0.9);
+		var position = new Vec2(largerBody.position.x, largerBody.position.y);
+		var momentum = new Vec2((_.velocity.x * _.mass + body.velocity.x * body.mass), (_.velocity.y * _.mass + body.velocity.y * body.mass));
+
+		if (mass > 0) {
+			var velocity = new Vec2(momentum.x / mass, momentum.y / mass);
+		} else {
+			var velocity = _.velocity.averageWith(body.velocity);
+		}
+
+		return new Body(radius, mass * 0.9, largerBody.rigid).setPosition(position).setVelocity(velocity);
 	}
 
 	this.distanceFrom = function(body) {
-		var dx = body.position.x - _.position.x;
-		var dy = body.position.y - _.position.y;
-
-		return Math.sqrt(dx*dx + dy*dy);
+		return Calculate.distance(_.position, body.position);
 	}
 
 	this.forceAt = function(position, scale) {
+		if (_.mass === 0) {
+			return {
+				x: 0,
+				y: 0
+			};
+		}
+
 		var dx = position.x - _.position.x;
 		var dy = position.y - _.position.y;
 		var r = Math.sqrt(dx*dx + dy*dy) * (scale || 1);

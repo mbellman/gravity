@@ -3,8 +3,8 @@
 	var screen;
 	var time = Date.now();
 	var running = false;
-
 	var delay = 1000 / 60;
+	var DT = delay / 1000;
 
 	var width = 1000;
 	var height = 600;
@@ -44,6 +44,10 @@
 		$('#coordinates').text(Math.round(x) + ', ' + Math.round(y));
 	}
 
+	function updateBodyCount(number) {
+		$('#bodies').text(number);
+	}
+
 	function grabCamera(e) {
 		var mouse = {
 			x: e.clientX,
@@ -74,7 +78,6 @@
 		// Private:
 		var _ = this;
 		var G = 66.7;
-		var maxForce = 500;
 		var distanceThreshold = 10;
 
 		var bodies = [];
@@ -116,9 +119,8 @@
 							var merged = body.mergeWith(body2);
 
 							bodies.splice(b, 1);
-							bodies.splice( (b < c ? c - 1 : c), 1);
-
-							_.addBody(merged.radius, merged.mass, merged.position, merged.velocity);
+							bodies.splice((b < c ? c - 1 : c), 1);
+							bodies.push(merged);
 
 							break;
 						}
@@ -138,11 +140,6 @@
 						continue;
 					}
 
-					if (acceleration.magnitude() > maxForce) {
-						// Normalize excessively high acceleration values
-						acceleration.normalize(maxForce);
-					}
-
 					body.accelerate(acceleration);
 					b++;
 				}
@@ -152,6 +149,8 @@
 					bodies[b].update(dt, reverse);
 				}
 			}
+
+			updateBodyCount(bodies.length);
 		}
 
 		// Draw all bodies
@@ -183,35 +182,45 @@
 			bodies.push(new Body(radius, mass, rigid).setPosition(position).setVelocity(velocity));
 		}
 
+		// Add an accretion disk, with customizable parameters
 		this.addAccretionDisk = function(options) {
-			$.extend({
-				x: halfWidth,
-				y: halfHeight,
+			options = $.extend({
+				position: new Vec2(halfWidth, halfHeight),
+				velocity: new Vec2(0, 0),
 				radius: 200,
 				bodies: 100,
-				masses: [1, 50]
+				masses: [1, 50],
+				rigid: false,
+				spin: 'counter-clockwise'
 			}, options);
 
 			var tau = 2 * Math.PI;
+			var spin = (options.spin === 'counter-clockwise' ? 1 : -1);
+
+			// Place central mass
+			var centerMass = options.masses[1] * 100000;
+			_.addBody(Calculate.radius(centerMass), centerMass, new Vec2(options.position.x, options.position.y), new Vec2(options.velocity.x, options.velocity.y), options.rigid);
+
+			// Estimate total disk mass
+			var totalMass = centerMass + (options.bodies * (options.masses[1] / 2));
 
 			for (var i = 0 ; i < options.bodies ; i++) {
 				// Distribute positions randomly around a pseudo-origin at [options.x, options.y]
 				var angle = Math.random() * tau;
 				var magnitude = Math.random() * options.radius;
-				var position = new Vec2(options.x + Math.cos(angle) * magnitude, options.y + Math.sin(angle) * magnitude);
+				var position = new Vec2(options.position.x + Math.cos(angle) * magnitude, options.position.y + Math.sin(angle) * magnitude);
 
 				// Set mass/size (heavier bodies nearer to center)
 				var mass = options.masses[0] + options.masses[1] * ((options.radius - magnitude) / options.radius);
-				var radius = 1 + Math.log(Math.max(1, mass)) / 10;
+				var radius = Calculate.radius(mass);
 
-				// Determine a semi-stable disk center orbital velocity vector for this body
-				var velocity = new Vec2(5000*Math.sin(angle) / (magnitude / distanceScalar), -5000*Math.cos(angle) / (magnitude / distanceScalar));
+				// Determine a stable orbital velocity vector for this body
+				var radiusRatio = magnitude / options.radius;
+				var otherMass = (totalMass - mass);
+				var orbitalVelocity = Calculate.orbitalVelocity((G/50) * otherMass, magnitude * distanceScalar);
+				var velocityVector = new Vec2(spin*Math.sin(angle), -spin*Math.cos(angle)).normalize(orbitalVelocity).translate(options.velocity.x, options.velocity.y);
 
-				if (velocity.magnitude() > 10) {
-					velocity.normalize(10);
-				}
-
-				_.addBody(radius, mass, position, velocity);
+				_.addBody(radius, mass, position, velocityVector);
 			}
 		}
 	}
@@ -224,7 +233,7 @@
 			var dt = ((Date.now() - time) / 1000);
 
 			// Update and re-draw simulation
-			simulation.tick(dt * speed);
+			simulation.tick(DT * speed);
 			simulation.render();
 
 			// Update latest frame time
@@ -255,11 +264,29 @@
 
 		// Customize initial state
 		simulation.addAccretionDisk({
-			x: 500,
-			y: 300,
+			position: new Vec2(500, 300),
 			radius: 300,
 			bodies: 500,
-			masses: [0, 1000]
+			masses: [0, 10],
+			spin: 'clockwise'
+		});
+
+		simulation.addAccretionDisk({
+			position: new Vec2(200, 100),
+			velocity: new Vec2(20, 0),
+			radius: 100,
+			bodies: 500,
+			masses: [0, 1],
+			spin: 'clockwise'
+		});
+
+		simulation.addAccretionDisk({
+			position: new Vec2(350, 500),
+			velocity: new Vec2(20, 0),
+			radius: 50,
+			bodies: 700,
+			masses: [0, 1],
+			spin: 'counter-clockwise'
 		});
 
 		main();

@@ -18,7 +18,8 @@
 		<div class="stats">
 			Coordinates: <span id="coordinates">0, 0</span><br />
 			Zoom: <span id="zoom">1</span>x<br />
-			Speed: <span id="speed">1</span>x
+			Speed: <span id="speed">1</span>x<br />
+			Bodies: <span id="bodies">0</span>
 		</div>
 	</body>
 </html>
