@@ -27,6 +27,7 @@
 	var zoom = 1;
 	var speed = 1;
 	var reverse = false;
+	var refresh = true;
 	var distanceScalar = 5;
 
 	function setZoom(value) {
@@ -86,7 +87,9 @@
 		// Update by a certain number of steps, each integrated over dt
 		this.tick = function(dt, steps) {
 			// Clear screen
-			screen.fill(Color.BLACK);
+			if (refresh) {
+				screen.fill(Color.BLACK);
+			}
 
 			steps = steps || 1;
 
@@ -97,7 +100,7 @@
 
 				while (bodies[b]) {
 					var body = bodies[b];
-					var acceleration = new Vec2(0, 0);
+					var acceleration = {x: 0, y: 0};
 					var c = 0;
 					var collision = false;
 
@@ -198,7 +201,7 @@
 			var spin = (options.spin === 'counter-clockwise' ? 1 : -1);
 
 			// Place central mass
-			var centerMass = options.masses[1] * 100000;
+			var centerMass = options.masses[1] * 1000000;
 			_.addBody(Calculate.radius(centerMass), centerMass, new Vec2(options.position.x, options.position.y), new Vec2(options.velocity.x, options.velocity.y), options.rigid);
 
 			// Estimate total disk mass
@@ -207,7 +210,7 @@
 			for (var i = 0 ; i < options.bodies ; i++) {
 				// Distribute positions randomly around a pseudo-origin at [options.x, options.y]
 				var angle = Math.random() * tau;
-				var magnitude = Math.random() * options.radius;
+				var magnitude = (Math.random()*Math.random()) * options.radius;
 				var position = new Vec2(options.position.x + Math.cos(angle) * magnitude, options.position.y + Math.sin(angle) * magnitude);
 
 				// Set mass/size (heavier bodies nearer to center)
@@ -215,9 +218,7 @@
 				var radius = Calculate.radius(mass);
 
 				// Determine a stable orbital velocity vector for this body
-				var radiusRatio = magnitude / options.radius;
-				var otherMass = (totalMass - mass);
-				var orbitalVelocity = Calculate.orbitalVelocity((G/50) * otherMass, magnitude * distanceScalar);
+				var orbitalVelocity = Calculate.orbitalVelocity((G/70) * (totalMass - mass), magnitude * distanceScalar);
 				var velocityVector = new Vec2(spin*Math.sin(angle), -spin*Math.cos(angle)).normalize(orbitalVelocity).translate(options.velocity.x, options.velocity.y);
 
 				_.addBody(radius, mass, position, velocityVector);
@@ -263,6 +264,7 @@
 		setCamera(halfWidth, halfHeight);
 
 		// Customize initial state
+		/*
 		simulation.addAccretionDisk({
 			position: new Vec2(500, 300),
 			radius: 300,
@@ -270,24 +272,26 @@
 			masses: [0, 10],
 			spin: 'clockwise'
 		});
+		*/
 
 		simulation.addAccretionDisk({
-			position: new Vec2(200, 100),
+			position: new Vec2(500, 300),
+			radius: 500,
+			bodies: 2000,
+			masses: [0, 10],
+			spin: 'clockwise'
+		});
+
+		/*
+		simulation.addAccretionDisk({
+			position: new Vec2(350, 500),
 			velocity: new Vec2(20, 0),
-			radius: 100,
+			radius: 200,
 			bodies: 500,
 			masses: [0, 1],
 			spin: 'clockwise'
 		});
-
-		simulation.addAccretionDisk({
-			position: new Vec2(350, 500),
-			velocity: new Vec2(20, 0),
-			radius: 50,
-			bodies: 700,
-			masses: [0, 1],
-			spin: 'counter-clockwise'
-		});
+		*/
 
 		main();
 	}
@@ -307,10 +311,17 @@
 				// Zoom in
 				setZoom(zoom * Math.pow(1.01, Math.abs(e.deltaY)));
 			}
+
+			e.preventDefault();
+			return false;
 		});
 
 		// Adjusting simulation speed/direction
 		$(document).on('keydown', function(e){
+			if (e.keyCode === 82) {
+				refresh = !refresh;
+			}
+
 			if (e.keyCode === 37) {
 				// Slow down simulation
 				setSpeed(speed * 0.9);

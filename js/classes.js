@@ -89,12 +89,7 @@ function Body(radius, mass, rigid) {
 		var radius = Calculate.radius(mass * 0.9);
 		var position = new Vec2(largerBody.position.x, largerBody.position.y);
 		var momentum = new Vec2((_.velocity.x * _.mass + body.velocity.x * body.mass), (_.velocity.y * _.mass + body.velocity.y * body.mass));
-
-		if (mass > 0) {
-			var velocity = new Vec2(momentum.x / mass, momentum.y / mass);
-		} else {
-			var velocity = _.velocity.averageWith(body.velocity);
-		}
+		var velocity = (mass > 0 ? new Vec2(momentum.x / mass, momentum.y / mass) : _.velocity.averageWith(body.velocity));
 
 		return new Body(radius, mass * 0.9, largerBody.rigid).setPosition(position).setVelocity(velocity);
 	}
@@ -104,17 +99,10 @@ function Body(radius, mass, rigid) {
 	}
 
 	this.forceAt = function(position, scale) {
-		if (_.mass === 0) {
-			return {
-				x: 0,
-				y: 0
-			};
-		}
-
 		var dx = position.x - _.position.x;
 		var dy = position.y - _.position.y;
 		var r = Math.sqrt(dx*dx + dy*dy) * (scale || 1);
-		var force = _.mass / (r*r);
+		var force = (_.mass > 0 ? _.mass / (r*r) : 0);
 
 		return {
 			x: (dx / r) * force,
