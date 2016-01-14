@@ -1,10 +1,14 @@
 (function(global, $){
 	var simulation;
 	var screen;
+	var maxWheelDeltaY = 1;
 	var time = Date.now();
 	var running = false;
 	var delay = 1000 / 60;
 	var DT = delay / 1000;
+
+	var resizeTimer;
+	var viewChangeTimer;
 
 	var width = 1000;
 	var height = 600;
@@ -24,6 +28,7 @@
 
 	// Rendering/simulation parameters
 	var camera = new Vec2(halfWidth, halfHeight);
+	var viewchange = false;
 	var zoom = 1;
 	var speed = 1;
 	var reverse = false;
@@ -32,21 +37,32 @@
 
 	function setZoom(value) {
 		zoom = value;
-		$('#zoom').text( Math.round(value * 100) / 100 );
+		//$('#zoom').text( Math.round(value * 100) / 100 );
 	}
 
 	function setSpeed(value) {
 		speed = value;
-		$('#speed').text( Math.round(value * 100) / 100 );
+		//$('#speed').text( Math.round(value * 100) / 100 );
 	}
 
 	function setCamera(x, y) {
 		camera.set(x, y);
-		$('#coordinates').text(Math.round(x) + ', ' + Math.round(y));
+		//$('#coordinates').text(Math.round(x) + ', ' + Math.round(y));
 	}
 
 	function updateBodyCount(number) {
-		$('#bodies').text(number);
+		//$('#bodies').text(number);
+	}
+
+	function viewChangeOn() {
+		clearTimeout(viewChangeTimer);
+		viewchange = true;
+	}
+
+	function viewChangeOff() {
+		viewChangeTimer = setTimeout(function(){
+			viewchange = false
+		}, 100);
 	}
 
 	function grabCamera(e) {
@@ -60,6 +76,8 @@
 			y: camera.y
 		};
 
+		viewChangeOn();
+
 		$(document).on('mousemove', function(e2){
 			var newX = initial.x + (mouse.x - e2.clientX) / zoom;
 			var newY = initial.y + (mouse.y - e2.clientY) / zoom;
@@ -69,6 +87,7 @@
 
 		$(document).on('mouseup', function(){
 			$(document).off('mouseup mousemove');
+			viewChangeOff();
 		});
 	}
 
@@ -88,7 +107,16 @@
 		this.tick = function(dt, steps) {
 			// Clear screen
 			if (refresh) {
-				screen.fill(Color.BLACK);
+				if (viewchange) {
+					// Dragging or zooming
+					screen.fill(Color.BLACK);
+				} else {
+					// Redraw only where bodies were to save rendering time
+					for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
+						var object = _.bodyOnScreen(bodies[b]);
+						screen.circle(object.x, object.y, object.radius * 2, '#000');
+					}
+				}
 			}
 
 			steps = steps || 1;
@@ -156,16 +184,20 @@
 			updateBodyCount(bodies.length);
 		}
 
+		// Returns the screen-space coordinates/radius for a body
+		this.bodyOnScreen = function(body) {
+			return {
+				x: halfWidth + (body.position.x - camera.x) * zoom,
+				y: halfHeight + (body.position.y - camera.y) * zoom,
+				radius: body.radius * zoom
+			};
+		}
+
 		// Draw all bodies
 		this.render = function() {
 			for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
 				var body = bodies[b];
-
-				var object = {
-					x: halfWidth + (body.position.x - camera.x) * zoom,
-					y: halfHeight + (body.position.y - camera.y) * zoom,
-					radius: body.radius * zoom
-				};
+				var object = _.bodyOnScreen(body);
 
 				// Only draw if body is within screen space
 				if (object.x + object.radius > 0 && object.x - object.radius < width) {
@@ -296,20 +328,63 @@
 		main();
 	}
 
+	function resetDimensions() {
+		var oldWidth = width;
+		var oldHeight = height;
+
+		width = $(window).width();
+		height = $(window).height();
+
+		halfWidth = width / 2;
+		halfHeight = height / 2;
+
+		camera.x *= (width / oldWidth);
+		camera.y *= (height / oldHeight);
+	}
+
+	function resizer() {
+		clearTimeout(resizeTimer);
+
+		resizeTimer = setTimeout(function(){
+			resetDimensions();
+			viewChangeOn();
+			viewChangeOff();
+
+			$('#screen').attr({
+				'width' : width,
+				'height' : height
+			});
+		}, 200);
+	}
+
 	$(window).load(function(){
+		$(window).resize(resizer);
+		resetDimensions();
+
 		// Camera drag
 		$('#screen').on('mousedown', grabCamera);
 
 		// Zooming
 		$(document).on('mousewheel', function(e){
-			if (e.deltaY < 0) {
-				// Zoom out
-				setZoom(zoom * Math.pow(0.99, Math.abs(e.deltaY)));
+			viewChangeOn();
+			viewChangeOff();
+
+			var wheelForce = Math.abs(e.deltaY);
+
+			if (wheelForce > maxWheelDeltaY) {
+				maxWheelDeltaY = wheelForce;
 			}
 
-			if (e.deltaY > 0) {
+			var normalizedDeltaY = e.deltaY * (35 / maxWheelDeltaY);
+
+			if (normalizedDeltaY < 0) {
+				// Zoom out
+				setZoom(zoom * Math.pow(0.99, Math.abs(normalizedDeltaY)));
+			}
+
+			if (normalizedDeltaY > 0) {
 				// Zoom in
-				setZoom(zoom * Math.pow(1.01, Math.abs(e.deltaY)));
+				setZoom(zoom * Math.pow(1.01, Math.abs(normalizedDeltaY)));
 			}
 
 			e.preventDefault();

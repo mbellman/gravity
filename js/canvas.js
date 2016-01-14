@@ -14,23 +14,23 @@ function Canvas(element, width, height) {
 	// Public:
 	this.rectangle = function(x, y, w, h, color) {
 		ctx.beginPath();
-		ctx.rect(x, y, w, h);
 		ctx.fillStyle = color;
+		ctx.rect(x, y, w, h);
 		ctx.fill();
 	}
 
 	this.circle = function(x, y, radius, color) {
 		ctx.beginPath();
-		ctx.arc(x, y, radius, 0, tau, false);
 		ctx.fillStyle = color;
+		ctx.arc(x, y, radius, 0, tau, false);
 		ctx.fill();
 	}
 
 	this.line = function(x1, y1, x2, y2, color) {
 		ctx.beginPath();
+		ctx.strokeStyle = color;
 		ctx.moveTo(x1, y1);
 		ctx.lineTo(x2, y2);
-		ctx.strokeStyle = color;
 		ctx.stroke();
 	}
 

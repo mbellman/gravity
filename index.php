@@ -8,7 +8,14 @@
 		<script src="js/sim.js"></script>
 
 		<style type="text/css">
+			body {
+				margin: 0;
+				overflow: hidden;
+			}
 
+			.stats {
+				display: none;
+			}
 		</style>
 	</head>
 
