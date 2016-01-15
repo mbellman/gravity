@@ -1,4 +1,16 @@
 /**
+ * Color bank
+ */
+var Color = {
+	WHITE: '#FFF',
+	BLACK: '#000',
+	RED: '#F00',
+	GREEN: '#0F0',
+	BLUE: '#00F',
+	PURPLE: '#606'
+};
+
+/**
  * Handy formulas
  */
 var Calculate = {
@@ -10,8 +22,17 @@ var Calculate = {
 		var dy = vec2a.y - vec2b.y;
 		return Math.sqrt(dx*dx + dy*dy);
 	},
+	magnitude: function(x, y) {
+		return Math.sqrt(x*x + y*y);
+	},
 	orbitalVelocity: function(mass, radius) {
 		return Math.sqrt(mass / radius);
+	}
+};
+
+var Utilities = {
+	clamp: function(num, min, max) {
+		return num < max ? (num > min ? num : min) : max;
 	}
 };
 
@@ -86,12 +107,13 @@ function Body(radius, mass, rigid) {
 		var largerBody = (_.mass > body.mass ? _ : body);
 
 		var mass = _.mass + body.mass;
-		var radius = Calculate.radius(mass * 0.9);
+		var newMass = mass * 0.99;
+		var radius = Calculate.radius(newMass);
 		var position = new Vec2(largerBody.position.x, largerBody.position.y);
 		var momentum = new Vec2((_.velocity.x * _.mass + body.velocity.x * body.mass), (_.velocity.y * _.mass + body.velocity.y * body.mass));
 		var velocity = (mass > 0 ? new Vec2(momentum.x / mass, momentum.y / mass) : _.velocity.averageWith(body.velocity));
 
-		return new Body(radius, mass * 0.9, largerBody.rigid).setPosition(position).setVelocity(velocity);
+		return new Body(radius, newMass, largerBody.rigid).setPosition(position).setVelocity(velocity);
 	}
 
 	this.distanceFrom = function(body) {
@@ -114,12 +136,16 @@ function Body(radius, mass, rigid) {
 		acceleration.set(_acceleration.x, _acceleration.y);
 	}
 
-	this.update = function(dt, reverse) {
+	this.update = function(dt, reverse, maxVelocity) {
 		if (!_.rigid) {
 			var direction = (reverse ? -1 : 1);
 
 			_.velocity.x += acceleration.x * dt * direction;
 			_.velocity.y += acceleration.y * dt * direction;
+
+			if (_.velocity.magnitude() > maxVelocity) {
+				_.velocity.normalize(maxVelocity);
+			}
 
 			_.position.x += _.velocity.x * dt * direction;
 			_.position.y += _.velocity.y * dt * direction;

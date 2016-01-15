@@ -1,7 +1,7 @@
 (function(global, $){
 	var simulation;
 	var screen;
-	var maxWheelDeltaY = 1;
+	var maxWheelDeltaY = 4;
 	var time = Date.now();
 	var running = false;
 	var delay = 1000 / 60;
@@ -16,16 +16,6 @@
 	var halfWidth = width/2;
 	var halfHeight = height/2;
 
-	// Color bank
-	var Color = {
-		WHITE: '#FFF',
-		BLACK: '#000',
-		RED: '#F00',
-		GREEN: '#0F0',
-		BLUE: '#00F',
-		PURPLE: '#606'
-	};
-
 	// Rendering/simulation parameters
 	var camera = new Vec2(halfWidth, halfHeight);
 	var viewchange = false;
@@ -33,10 +23,9 @@
 	var speed = 1;
 	var reverse = false;
 	var refresh = true;
-	var distanceScalar = 5;
 
 	function setZoom(value) {
-		zoom = value;
+		zoom = Utilities.clamp(value, 0.1, 40);
 		//$('#zoom').text( Math.round(value * 100) / 100 );
 	}
 
@@ -61,7 +50,7 @@
 
 	function viewChangeOff() {
 		viewChangeTimer = setTimeout(function(){
-			viewchange = false
+			viewchange = false;
 		}, 100);
 	}
 
@@ -94,13 +83,19 @@
 	/**
 	 * Simulation logic
 	 */
-	function Simulation() {
+	function Simulation(options) {
 		// Private:
-		var _ = this;
-		var G = 66.7;
-		var distanceThreshold = 10;
+		options = $.extend({
+			G: 66.7,
+			scale: 5
+		}, options);
 
+		var _ = this;
+		var G = options.G;
+		var distanceScalar = options.scale;
 		var bodies = [];
+
+		var maxVelocity = 1 + 3500 * (1 / distanceScalar);
 
 		// Public:
 		// Update by a certain number of steps, each integrated over dt
@@ -114,7 +109,7 @@
 					// Redraw only where bodies were to save rendering time
 					for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
 						var object = _.bodyOnScreen(bodies[b]);
-						screen.circle(object.x, object.y, object.radius * 2, '#000');
+						screen.circle(object.x, object.y, Math.max(2, object.radius * 2), '#000');
 					}
 				}
 			}
@@ -128,7 +123,7 @@
 
 				while (bodies[b]) {
 					var body = bodies[b];
-					var acceleration = {x: 0, y: 0};
+					var acceleration = new Vec2(0, 0);
 					var c = 0;
 					var collision = false;
 
@@ -177,7 +172,7 @@
 
 				// After acceleration is calculated for each body, update their positions
 				for (var b = 0, bodyCount = bodies.length ; b < bodyCount ; b++) {
-					bodies[b].update(dt, reverse);
+					bodies[b].update(dt, reverse, maxVelocity);
 				}
 			}
 
@@ -250,7 +245,7 @@
 				var radius = Calculate.radius(mass);
 
 				// Determine a stable orbital velocity vector for this body
-				var orbitalVelocity = Calculate.orbitalVelocity((G/70) * (totalMass - mass), magnitude * distanceScalar);
+				var orbitalVelocity = Calculate.orbitalVelocity((G / Math.pow(distanceScalar, 2)) * (totalMass - mass), magnitude * distanceScalar);
 				var velocityVector = new Vec2(spin*Math.sin(angle), -spin*Math.cos(angle)).normalize(orbitalVelocity).translate(options.velocity.x, options.velocity.y);
 
 				_.addBody(radius, mass, position, velocityVector);
@@ -288,8 +283,13 @@
 		// Permit main loop
 		running = true;
 
-		// Restart simulation + refresh screen
-		simulation = new Simulation();
+		// Restart simulation
+		simulation = new Simulation({
+			G: 6.67,
+			scale: 5
+		});
+
+		// Refresh screen
 		resetScreen();
 
 		// Initialize camera at origin
@@ -306,24 +306,33 @@
 		});
 		*/
 
+		/*
 		simulation.addAccretionDisk({
 			position: new Vec2(500, 300),
 			radius: 500,
-			bodies: 2000,
+			bodies: 1000,
 			masses: [0, 10],
 			spin: 'clockwise'
 		});
+		*/
 
-		/*
 		simulation.addAccretionDisk({
-			position: new Vec2(350, 500),
-			velocity: new Vec2(20, 0),
+			position: new Vec2(900, 400),
+			velocity: new Vec2(-10, 20),
 			radius: 200,
 			bodies: 500,
 			masses: [0, 1],
 			spin: 'clockwise'
 		});
-		*/
+
+		simulation.addAccretionDisk({
+			position: new Vec2(400, 500),
+			velocity: new Vec2(20, 0),
+			radius: 400,
+			bodies: 500,
+			masses: [0, 10],
+			spin: 'clockwise'
+		});
 
 		main();
 	}
@@ -375,7 +384,7 @@
 				maxWheelDeltaY = wheelForce;
 			}
 
-			var normalizedDeltaY = e.deltaY * (35 / maxWheelDeltaY);
+			var normalizedDeltaY = e.deltaY * (40 / maxWheelDeltaY);
 
 			if (normalizedDeltaY < 0) {
 				// Zoom out
@@ -395,6 +404,7 @@
 		$(document).on('keydown', function(e){
 			if (e.keyCode === 82) {
 				refresh = !refresh;
+				screen.fill(Color.BLACK);
 			}
 
 			if (e.keyCode === 37) {
@@ -410,6 +420,10 @@
 			if (e.keyCode === 32) {
 				// Time reversal
 				reverse = !reverse;
+			}
+
+			if (e.keyCode === 83) {
+				main();
 			}
 		});
 
